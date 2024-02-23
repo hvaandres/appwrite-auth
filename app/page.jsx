@@ -3,48 +3,79 @@ import { useEffect, useState } from "react"
 import {account, ID} from './appwrite'
 
 export default function Home() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [user, setUser] = useState(null);
-  const [loadingUser, setLoadingUser] = useState(true)
-
-  console.log({user})
+  const [loadingUser, setLoadingUser] = useState(true);
+  const [loadingAction, setLoadingAction] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    async function getUser(){
-      setUser(await account.get())
-      setLoadingUser(false)
+    async function getUser() {
+      try {
+        setUser(await account.get());
+        setLoadingUser(false);
+      } catch (error) {
+        console.error(error);
+        setLoadingUser(false);
+      }
     }
     getUser();
-  }, [])
+  }, []);
 
-  async function handleLogout(){
+  async function handleLogout() {
     try {
+      setLoadingAction(true);
       await account.deleteSession('current');
-      setUser(null)
-    } catch(e){
-      console.error(e)
+      setUser(null);
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setLoadingAction(false);
     }
   }
 
-  async function handleLogin(){
+  // Function to clear error message
+  function clearError() {
+    setError(null);
+  }
+
+  async function handleLogin() {
     try {
+      setLoadingAction(true);
       await account.createEmailSession(email, password);
-      setUser(await account.get())
-      setEmail('')
-      setPassword('')
-    } catch (e){
-      console.error(e)
+      setUser(await account.get());
+      setEmail('');
+      setPassword('');
+      clearError(); // Clear error after successful login
+    } catch (error) {
+      if (error.code === 401) {
+        setError("Password incorrect, please try one more time");
+      } else if (error.code === 404) {
+        setError("You currently don't have an account with us, please click on register");
+      } else {
+        setError(error.message);
+      }
+    } finally {
+      setLoadingAction(false);
     }
   }
-
-  async function handleRegister(){
-      try {
-        await account.create(ID.unique(), email, password)
-        await handleLogin()
-      } catch(e){
-        console.error(e)
+  
+  async function handleRegister() {
+    try {
+      setLoadingAction(true);
+      await account.create(ID.unique(), email, password);
+      await handleLogin();
+      clearError(); // Clear error after successful registration
+    } catch (error) {
+      if (error.code === 107) {
+        setError("You already have an account created with us");
+      } else {
+        setError(error.message);
       }
+    } finally {
+      setLoadingAction(false);
+    }
   }
 
   if (loadingUser){
@@ -82,40 +113,52 @@ export default function Home() {
 
 
   return (
-    <main className="dark:bg-gray-900 min-h-screen flex flex-col items-center justify-center p-10">
-    <h1 className="text-3xl font-bold text-white mb-6">Log In or Sign Up Page</h1>
-    <form className="space-y-6">
-      <input 
-        type="email" 
-        placeholder='Email' 
-        value={email} 
-        onChange={(e) => setEmail(e.target.value)}
-        className="dark:bg-gray-800 w-72 p-3 rounded-md border border-gray-600 dark:text-white focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-      />
-      <input 
-        type="password" 
-        placeholder='Password' 
-        value={password} 
-        onChange={(e) => setPassword(e.target.value)}
-        className="dark:bg-gray-800 w-72 p-3 m-2 rounded-md border border-gray-600 dark:text-white focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-      />
-      <div className="flex space-x-4">
-        <button 
-          type="button" 
-          onClick={handleLogin}
-          className="w-32 p-3 rounded-md bg-blue-500 hover:bg-blue-600 text-white focus:outline-none focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-        >
-          Login
-        </button>
-        <button 
-          type="button" 
-          onClick={handleRegister}
-          className="w-32 p-3 rounded-md bg-gray-600 hover:bg-gray-700 text-white focus:outline-none focus:ring focus:ring-gray-200 focus:ring-opacity-50"
-        >
-          Register
-        </button>
-      </div>
-    </form>
-  </main>
-  )
+    <main className="dark:black min-h-screen flex flex-col items-center justify-center p-10 relative">
+      <h1 className="text-3xl font-bold text-white mb-6">Log In or Sign Up Page</h1>
+      {error && (
+        <div className="text-red-500 mb-4">
+          {error}
+        </div>
+      )}
+      <form className={`space-y-6 w-72 ${loadingAction ? 'blur' : ''}`}>
+        <input 
+          type="email" 
+          placeholder='Email' 
+          value={email} 
+          onChange={(e) => setEmail(e.target.value)}
+          className="dark:bg-black dark:text-white w-full p-3 rounded-md border border-white focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+        />
+        <input 
+          type="password" 
+          placeholder='Password' 
+          value={password} 
+          onChange={(e) => setPassword(e.target.value)}
+          className="dark:bg-black dark:text-white w-full p-3 rounded-md border border-white focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+        />
+        <div className="flex space-x-4">
+          <button 
+            type="button" 
+            onClick={handleLogin}
+            disabled={loadingAction} // Disable button while loading
+            className="w-full p-3 rounded-md border border-white text-white hover:bg-white hover:text-black focus:outline-none focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+          >
+            Login
+          </button>
+          <button 
+            type="button" 
+            onClick={handleRegister}
+            disabled={loadingAction} // Disable button while loading
+            className="w-full p-3 rounded-md border border-white text-white hover:bg-white hover:text-black focus:outline-none focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+          >
+            Register
+          </button>
+        </div>
+      </form>
+      {loadingAction && (
+        <div className="watch-container">
+          <div className="watch"></div>
+        </div>
+      )}
+    </main>
+  );    
 }
